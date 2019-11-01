@@ -1,12 +1,11 @@
 pragma solidity ^0.5.1;
 import "./acta.sol";
-import "./mphr.sol";
 
 contract PartialPHR {
 
     event Notification(bytes32 eventName);
 
-    address private patient;
+    address public patient;
     address public provider;
     address payable actaAddr = 0x23702ecb660A2b10e6D1c47c6ECbC8F410980f56;
     Acta acta;
@@ -27,11 +26,6 @@ contract PartialPHR {
 
         acta = Acta(actaAddr);
         require(acta._isMember(provider) == true);
-
-        /*
-        MPHR masterPHR = MPHR(patient);
-        masterPHR.newPartialPHR(provider, name);
-        */
 
         for(uint i = 0; i < sections.length; i++) {
             sectionList.push(sections[i]);

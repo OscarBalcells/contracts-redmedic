@@ -7,7 +7,7 @@ contract MasterPHR {
     struct PPHR {
         bytes32 providerName;
         address providerAddr;
-				bytes32 gateway;
+		bytes32 gateway;
         address pphrAddr;
         bool exists;
     }
@@ -20,19 +20,18 @@ contract MasterPHR {
 
 		//important ones
     mapping (bytes32 => PPHR) private pphrs;
-    mapping (bytes32 => PPHR) private pphrsUnconfirmed;
 
-    mapping (address => bytes32) private addrToName;
-    bytes32[] private providerNameList;
     mapping (bytes32 => uint) gatewayAtIndex;
-    bytes32[] private gateways;
+    bytes32[] public gateways;
+
+    bytes32[] public pphrList; //we don't need at index because it matches gateways order
 
     constructor(bytes32 _id) public {
         id = _id;
         patientAddr = msg.sender;
     }
 
-		//gets sent by the provider who establishes the pphr relationship
+	//gets sent by the provider who establishes the pphr relationship
     function newPPHR(address pphrAddr) public {
         require(acta._isMember(msg.sender) == true);
 
@@ -40,30 +39,22 @@ contract MasterPHR {
         (providerName, gateway) = acta.getMember(msg.sender);
 
         require(pphrs[providerName].exists == false);
-        require(pphrsUnconfirmed[providerName].exists == false);
 
-        pphrsUnconfirmed[providerName] = PPHR({
+        pphrs[providerName] = PPHR({
             providerName: providerName,
             providerAddr: msg.sender,
-						gateway: gateway,
+			gateway: gateway,
             pphrAddr: pphrAddr,
             exists: true
         });
 
-        addrToName[msg.sender] = providerName;
-        addrToName[pphrAddr] = providerName;
-    }
+        gateways.push(gateway);
+        gatewayAtIndex[gateway] = gateways.length-1;
 
-		//gets sent by the patient owner of this contract
-    function confirmPPHR(bytes32 name) public {
-				require(msg.sender == patientAddr);
-        require(pphrs[name].exists == false);
-        require(pphrsUnconfirmed[name].exists == true);
+        pphrList.push(pphrs[providerName].providerName);
 
-        pphrs[name] = pphrsUnconfirmed[name];
-        gateways.push(pphrs[name].gateway);
-        gatewayAtIndex[pphrs[name].gateway] = gateways.length-1;
-        delete pphrsUnconfirmed[name];
+		PartialPHR pphr = PartialPHR(pphrAddr);
+		pphr.grantAccess(patientAddr, "all", 0);
     }
 
     ///Interaction with Partial PHR's
@@ -76,20 +67,18 @@ contract MasterPHR {
             PartialPHR pphr = PartialPHR(pphrs[name].pphrAddr);
             gateway = pphrs[name].gateway;
             pphr.destroy();
-        } else if(pphrsUnconfirmed[name].exists == true) {
-            PartialPHR pphr = PartialPHR(pphrsUnconfirmed[name].pphrAddr);
-            gateway = pphrs[name].gateway;
-            pphr.destroy();
-            return;
         } else {
             revert();
         }
 
-				//delete the gateway from the list
+		//delete the gateway from the list
         uint index = gatewayAtIndex[gateway];
         gateways[index] = gateways[gateways.length-1];
         gatewayAtIndex[gateways[index]] = index;
         gateways.length--;
+
+        pphrList[index] = pphrList[pphrList.length-1];
+        pphrList.length--;
     }
 
 	function grantAccess(bytes32 name, address addr, bytes32 section, uint nHours) public {
@@ -109,14 +98,15 @@ contract MasterPHR {
     ///EXTERNAL QUERY FUNCTIONS
 
     function returnGateways() public view returns (bytes32[] memory) {
-        require(msg.sender == patientAddr);
         return gateways;
     }
 
-    function getPPHR(bytes32 name) public view returns (address providerAddr,
-    address pphrAddr, bytes32 gateway) {
+    function returnPPHRs() public view returns (bytes32[] memory) {
+        return pphrList;
+    }
+
+    function getPPHR(bytes32 name) public view returns (address, address, bytes32) {
         require(pphrs[name].exists == true);
-        require(msg.sender == patientAddr);
         return (pphrs[name].providerAddr,
         pphrs[name].pphrAddr, pphrs[name].gateway);
     }
